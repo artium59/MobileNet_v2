@@ -86,7 +86,7 @@ def VGGNet(input_shape, num_classes, name, is_vgg16):
     x = layers.Flatten()(x)
     x = layers.Dense(units=4096, activation='relu', name='FC-4096_1')(x)
     x = layers.Dense(units=4096, activation='relu', name='FC-4096_2')(x)
-    x = layers.Dense(units=num_classes, activation='softmax', name='FC-1000')(x)
+    x = layers.Dense(units=num_classes, activation='softmax', name='FC-{}'.format(num_classes))(x)
 
     # Create model
     model = Model(inputs, x, name=name)
@@ -117,12 +117,12 @@ if __name__ == '__main__':
 
     img_path = 'cat.jpg'
     img = image.load_img(img_path, target_size=input_shape)
-    x = image.img_to_array(img)
-    x = np.expand_dims(x, axis=0)
-    x = preprocess_input(x)
-    print('Input image tensor: {}'.format(x.shape))
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array = preprocess_input(img_array)
+    print('Input image tensor: {}'.format(img_array.shape))
 
-    assert len(x.shape) == 4, 'x.shape is (1, 224, 224, 3)'
-    pred = model.predict(x)
+    assert len(img_array.shape) == 4, 'x.shape is (1, 224, 224, 3)'
+    pred = model.predict(img_array)
     pred = np.array(decode_predictions(pred)).reshape(-1, 3)
     print(pred)
