@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 """
 Very Deep Convolutional Networks for Large-Scale Image Recognition
 Karen Simonyan, Andrew Zisserman, 2015
@@ -8,16 +7,10 @@ https://arxiv.org/pdf/1409.1556.pdf
 http://www.robots.ox.ac.uk/~vgg/research/very_deep/
 """
 
+import numpy as np
 from tensorflow.python.keras import Input, Model, layers, utils
-
-input_shape = (224, 224, 3)
-num_classes = 1000
-WEIGHTS_PATH = 'https://github.com/fchollet/deep-learning-models/releases' \
-               '/download/v0.1/vgg16_weights_tf_dim_ordering_tf_kernels.h5 '
-
-
-def preprocess_input(inputs):
-    pass
+from tensorflow.python.keras.preprocessing import image
+from tensorflow.python.keras.applications.imagenet_utils import preprocess_input, decode_predictions
 
 
 def convolution_layer(inputs, filters, kernel_size, is_padding, number):
@@ -29,7 +22,7 @@ def convolution_layer(inputs, filters, kernel_size, is_padding, number):
             3×3 : which is the smallest size to capture the notion of left/right, up/down, center.
             1×1 : which can be seen as a linear transformation of the input channels (followed by non-linearity).
                   (Only ConvNet configuration C uses)
-        is_padding: Bool, true if kernel_size == 3x3
+        is_padding: Bool, True if kernel_size == 3x3
             Spatial padding of convolution layer input is such that the spatial resolution is preserved after convolution
         number: Integer, count the convolution layer
     # Returns
@@ -41,9 +34,9 @@ def convolution_layer(inputs, filters, kernel_size, is_padding, number):
     return layers.ReLU()(x)
 
 
-def VGGNet_16_layers(input_shape, num_classes, name='VGG16'):
+def VGGNet(input_shape, num_classes, name, is_vgg16):
     """
-    This is ConvNet configuration D
+    This is ConvNet configuration D.
     The convolution layer parameters are denoted as "conv{receptive field size}-{number of channels}_{number}"
 
     # Arguments
@@ -70,18 +63,24 @@ def VGGNet_16_layers(input_shape, num_classes, name='VGG16'):
     x = convolution_layer(x, 256, 3, True, 1)
     x = convolution_layer(x, 256, 3, True, 2)
     x = convolution_layer(x, 256, 3, True, 3)
+    if not is_vgg16:
+        x = convolution_layer(x, 256, 3, True, 4)
     x = layers.MaxPooling2D(pool_size=(2, 2), strides=2, name='block3_maxpool')(x)
 
     # Block 4
     x = convolution_layer(x, 512, 3, True, 1)
     x = convolution_layer(x, 512, 3, True, 2)
     x = convolution_layer(x, 512, 3, True, 3)
+    if not is_vgg16:
+        x = convolution_layer(x, 512, 3, True, 4)
     x = layers.MaxPooling2D(pool_size=(2, 2), strides=2, name='block4_maxpool')(x)
 
     # Block 5
-    x = convolution_layer(x, 512, 3, True, 4)
     x = convolution_layer(x, 512, 3, True, 5)
     x = convolution_layer(x, 512, 3, True, 6)
+    x = convolution_layer(x, 512, 3, True, 7)
+    if not is_vgg16:
+        x = convolution_layer(x, 512, 3, True, 8)
     x = layers.MaxPooling2D(pool_size=(2, 2), strides=2, name='block5_maxpool')(x)
 
     x = layers.Flatten()(x)
@@ -93,7 +92,11 @@ def VGGNet_16_layers(input_shape, num_classes, name='VGG16'):
     model = Model(inputs, x, name=name)
 
     # Load weights
-    weights_path = utils.get_file('vgg16_weights_tf_dim_ordering_tf_kernels.h5',
+    weights = 16 if is_vgg16 else 19
+    WEIGHTS_PATH = 'https://github.com/fchollet/deep-learning-models/releases' \
+                   '/download/v0.1/vgg{}_weights_tf_dim_ordering_tf_kernels.h5'.format(weights)
+
+    weights_path = utils.get_file('vgg{}_weights_tf_dim_ordering_tf_kernels.h5'.format(weights),
                                   WEIGHTS_PATH,
                                   cache_dir='models')
     model.load_weights(weights_path)
@@ -101,15 +104,25 @@ def VGGNet_16_layers(input_shape, num_classes, name='VGG16'):
     return model
 
 
-def VGGNet_19_layers(input_shape, num_classes, weights_file_path):
-    inputs = Input(shape=input_shape)
-    pass
-
-
-def train(vgg_model):
-    pass
-
-
 if __name__ == '__main__':
-    model = VGGNet_16_layers(input_shape, num_classes)
+    input_shape = (224, 224, 3)
+    num_classes = 1000
+    is_vgg16 = True
+    name = 'VGG16' if is_vgg16 else 'VGG19'
+
+    # Number of Parameters
+    # VGG16: 138M, VGG19: 144M
+    model = VGGNet(input_shape, num_classes, name=name, is_vgg16=is_vgg16)
     model.summary()
+
+    img_path = 'cat.jpg'
+    img = image.load_img(img_path, target_size=input_shape)
+    x = image.img_to_array(img)
+    x = np.expand_dims(x, axis=0)
+    x = preprocess_input(x)
+    print('Input image tensor: {}'.format(x.shape))
+
+    assert len(x.shape) == 4, 'x.shape is (1, 224, 224, 3)'
+    pred = model.predict(x)
+    pred = np.array(decode_predictions(pred)).reshape(-1, 3)
+    print(pred)
